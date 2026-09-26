@@ -13,7 +13,8 @@
 - `scripts/check_report.py` — перевірка звіту перед публікацією: узгодженість цифр, PII, рендер у Chromium (375px і 1280px). Повертає JSON.
 - `templates/bug_ticket.adf.json` — каркас опису тікета в ADF.
 - `templates/report.html` — шаблон звіту; заповнюється лише JSON-блок з даними.
-- `ROUTINE_PROMPT.md` — актуальний текст промпту рутини.
+- `ROUTINE_PROMPT.md` — короткий промпт рутини після підключення репозиторію.
+- `ROUTINE_PROMPT_STANDALONE.md` — повний автономний промпт, що зараз стоїть у рутині (поки репозиторій не підключено). Зміни правил дублювати туди й у рутину.
 
 ## Сталі значення
 - Jira: сайт `jijing.atlassian.net`, cloudId `4ae966c7-4f95-4aac-9ee7-24cee120152f`, проєкт `JIJI`.
