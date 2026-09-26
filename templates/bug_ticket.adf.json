@@ -1,0 +1,90 @@
+{
+  "_comment": "Каркас опису баг-тікета (contentFormat: adf). Заміни {{...}}, прибери це поле. Секції — рівно ці, без додаткових. Останній top-level вузол — expand 'Українською' з перекладом УСІХ секцій. Для low-confidence Code origin пише 'possible source'; без доступу до Bitbucket — 'Code origin: no access to Bitbucket'.",
+  "type": "doc",
+  "version": 1,
+  "content": [
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "{{WHAT_FAILS — what fails, the exact error, env/version}}" }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "Datadog evidence", "marks": [{ "type": "strong" }] }]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Service: {{celery|uwsgi}}" }] }] },
+        { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Task/endpoint: {{TASK_OR_ENDPOINT}}" }] }] },
+        { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Count: {{N}} in {{WINDOW_FROM_UTC}} – {{WINDOW_TO_UTC}}" }] }] },
+        { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Hosts/countries (prod): {{AGGREGATES}}" }] }] },
+        { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Version: {{VERSION}}" }] }] }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "Link: " },
+        { "type": "text", "text": "Datadog logs", "marks": [{ "type": "link", "attrs": { "href": "{{LOGS_EXPLORER_URL — only from the tool response}}" } }] }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "Trace", "marks": [{ "type": "strong" }] }]
+    },
+    {
+      "type": "codeBlock",
+      "attrs": { "language": "python" },
+      "content": [{ "type": "text", "text": "{{STACK_TRACE — no tokens, no PII}}" }]
+    },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "Code origin", "marks": [{ "type": "strong" }] }]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Location: {{file:line}} in {{function}}" }] }] },
+        { "type": "listItem", "content": [{ "type": "paragraph", "content": [
+          { "type": "text", "text": "Commit: " },
+          { "type": "text", "text": "{{SHORT_SHA}}", "marks": [{ "type": "link", "attrs": { "href": "https://bitbucket.org/cls-gentech/{{SLUG}}/commits/{{SHA}}" } }] },
+          { "type": "text", "text": " ({{DATE}})" }
+        ] }] },
+        { "type": "listItem", "content": [{ "type": "paragraph", "content": [
+          { "type": "text", "text": "PR: " },
+          { "type": "text", "text": "{{PR_TITLE}}", "marks": [{ "type": "link", "attrs": { "href": "{{PR_URL — from the API response}}" } }] }
+        ] }] },
+        { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Jira task: {{JIJI-XXXX — what it was about}}" }] }] },
+        { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Confidence: {{high|medium|low}} — {{one-sentence justification}}" }] }] },
+        { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Analyzed ref: {{REF}}{{ (version tag not found, used main)}}" }] }] }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "Root cause", "marks": [{ "type": "strong" }] },
+        { "type": "text", "text": " (hypothesis): {{HYPOTHESIS}}" }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "Impact", "marks": [{ "type": "strong" }] },
+        { "type": "text", "text": ": {{FLOWS, number of countries, since when}}" }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "Auto-created by the Datadog error-triage routine for review.", "marks": [{ "type": "em" }] }]
+    },
+    {
+      "type": "expand",
+      "attrs": { "title": "Українською" },
+      "content": [
+        { "type": "paragraph", "content": [{ "type": "text", "text": "{{Переклад усіх секцій вище: абзац, Datadog evidence, посилання, Trace (codeBlock можна повторити), Code origin, Root cause, Impact, примітка про авто-створення}}" }] }
+      ]
+    }
+  ]
+}
