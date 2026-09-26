@@ -18,7 +18,8 @@
 
 ## Сталі значення
 - Jira: сайт `jijing.atlassian.net`, cloudId `4ae966c7-4f95-4aac-9ee7-24cee120152f`, проєкт `JIJI`.
-  Тип тікета — Bug, мітка `auto-triage`, Component/s — `customfield_10100` (labels-type).
+  Тип тікета — Bug, мітка `auto-triage`, Component/s — `customfield_10100` (labels-type),
+  Developer №1 — `customfield_10600` (userpicker, автор коміту-джерела).
 - Bitbucket: workspace `cls-gentech`, репозиторій — змінна оточення `BITBUCKET_REPO_SLUG`.
   Доступ — `BITBUCKET_EMAIL` + `BITBUCKET_API_TOKEN` (Atlassian API token зі скоупом Bitbucket read).
 
@@ -29,6 +30,8 @@
    Не копіювати токени, ключі чи authorization-заголовки зі стек-трейсів або коду.
 3. **Без PII** у тікетах, звіті й виводі сесії: телефони (зокрема номери відправників), email, IP, user id, точні локації,
    імена/email/логіни авторів комітів — маскувати або агрегувати. У Datadog запитувати лише потрібні для тріажу поля, без ідентифікаторів користувачів.
+   Єдиний виняток — Atlassian account id автора коміту-джерела (`author_account_id` з `scripts/code_origin.py`):
+   його можна лише передати в поле Developer №1 тікета, але не писати в текст тікета, звіт чи вивід сесії.
 4. **Без вигаданих цифр.** Кожне число — з реального запиту в межах вікна аналізу. Цифри мають узгоджуватися між собою.
 5. **Посилання на Datadog** — лише `logs_explorer_url` з відповіді інструмента, ніколи не збирати URL вручну.
 6. **Збої викликів.** Якщо виклик Datadog/Jira/Bitbucket падає (auth, "requires approval" тощо) — не вгадувати результат:
