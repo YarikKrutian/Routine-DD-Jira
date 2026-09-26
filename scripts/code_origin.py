@@ -5,7 +5,9 @@ Reads Bitbucket credentials from BITBUCKET_EMAIL / BITBUCKET_API_TOKEN and the r
 from BITBUCKET_REPO_SLUG. The token never appears in argv, URLs or output: git gets it
 through a credential helper that reads the env var at runtime, the API through basic auth.
 
-Output is JSON on stdout. Commit authors are deliberately never included.
+Output is JSON on stdout. Commit author names, emails and logins are never included:
+the only author data is `author_account_id`, the opaque Atlassian account id Bitbucket
+reports for the commit, used to fill the Jira "Developer №1" field.
 
 Examples:
   code_origin.py --file app/tasks/sms.py --line 142 --function send_sms --version 2026.09.25.1
@@ -107,18 +109,36 @@ def commit_info(repo_dir, sha):
     }
 
 
-def bitbucket_prs(slug, sha):
+def bitbucket_get(slug, path):
+    """GET a Bitbucket API path; returns (data, None) or (None, error string)."""
     email, token = os.environ.get("BITBUCKET_EMAIL"), os.environ.get("BITBUCKET_API_TOKEN")
-    url = f"https://api.bitbucket.org/2.0/repositories/{WORKSPACE}/{slug}/commit/{sha}/pullrequests"
+    url = f"https://api.bitbucket.org/2.0/repositories/{WORKSPACE}/{slug}/{path}"
     req = urllib.request.Request(url)
     req.add_header("Authorization", "Basic " + base64.b64encode(f"{email}:{token}".encode()).decode())
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.load(resp)
+            return json.load(resp), None
     except urllib.error.HTTPError as e:
-        return {"error": f"HTTP {e.code}"}
+        return None, f"HTTP {e.code}"
     except urllib.error.URLError as e:
-        return {"error": str(e.reason)[:200]}
+        return None, str(e.reason)[:200]
+
+
+def bitbucket_author(slug, sha):
+    """Only the Atlassian account id of the commit author; raw/display_name/nickname are dropped."""
+    data, err = bitbucket_get(slug, f"commit/{sha}")
+    if err:
+        return {"author_account_id": None, "author_error": err}
+    user = (data.get("author") or {}).get("user") or {}
+    if not user.get("account_id"):
+        return {"author_account_id": None, "author_error": "commit author is not linked to an Atlassian account"}
+    return {"author_account_id": user["account_id"]}
+
+
+def bitbucket_prs(slug, sha):
+    data, err = bitbucket_get(slug, f"commit/{sha}/pullrequests")
+    if err:
+        return {"error": err}
     prs = []
     for pr in data.get("values", []):
         branch = ((pr.get("source") or {}).get("branch") or {}).get("name", "")
@@ -143,7 +163,7 @@ def main():
     p.add_argument("--version", help="Datadog version tag")
     p.add_argument("--repo-dir", default="/tmp/backend")
     p.add_argument("--no-clone", action="store_true", help="use --repo-dir as is (tests)")
-    p.add_argument("--no-api", action="store_true", help="skip Bitbucket PR lookup")
+    p.add_argument("--no-api", action="store_true", help="skip Bitbucket PR and author lookup")
     a = p.parse_args()
 
     if not (a.file and a.line) and not a.search:
@@ -198,6 +218,7 @@ def main():
         if slug and not a.no_api:
             info["commit_url"] = f"https://bitbucket.org/{WORKSPACE}/{slug}/commits/{sha}"
             info["pull_requests"] = bitbucket_prs(slug, sha)
+            info.update(bitbucket_author(slug, sha))
         commits.append(info)
     # Commits that touched the failing line first, then newest first.
     commits.sort(key=lambda c: c["date"], reverse=True)

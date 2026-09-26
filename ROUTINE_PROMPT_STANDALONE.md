@@ -62,6 +62,10 @@ ANALYSIS WINDOW: strictly the last 12 hours (from: now-12h, to: now). All Datado
       Do not invent a connection: if nothing is convincing — say so.
       If the cause is clearly outside the code (third-party service settings, partner data) — say so.
    f) Do not record names, emails or logins of commit authors — only SHA, date, PR and Jira key.
+   g) For the commit named as the source in Code origin, get the author's Atlassian account id
+      (Bitbucket API: /repositories/cls-gentech/$BITBUCKET_REPO_SLUG/commit/<sha>, field author.user.account_id).
+      Read only that field — ignore author.raw, display_name and nickname. Use the account id only for the
+      Developer field (section 4); never write it into the ticket text, the report or the session output.
 
 4. TICKETS (only for 🔴), project JIJI, type Bug, label: auto-triage.
    MANDATORY FORMATTING RULES (skill jira-bug-report-rules — load it via Skill before the first createJiraIssue; these rules apply whether or not the skill loads):
@@ -75,9 +79,16 @@ ANALYSIS WINDOW: strictly the last 12 hours (from: now-12h, to: now). All Datado
      backend, prod, the runtime (celery or uwsgi) and 1–2 topical tags for the module/feature.
      Before the first ticket, look at existing values:
      JQL project = JIJI AND labels = auto-triage AND cf[10100] is not EMPTY ORDER BY created DESC.
+   - DEVELOPER №1: customfield_10600 (user picker) = the author of the source commit from Code origin.
+     Only if confidence is high or medium and the author account id was found — pass it in createJiraIssue
+     additional_fields: {"customfield_10600": {"accountId": "<author account id>"}}.
+     For low confidence, no Bitbucket access or no linked account — leave it empty and give the reason in the summary
+     ("Developer: not set — <reason>"). If Jira rejects the create because of this field — create the ticket without it
+     and give the reason. Do not change the assignee.
    - VERIFICATION: after creating each ticket, call getJiraIssue (fields: description, customfield_10100,
-     responseContentFormat: adf) and confirm the body is in English, the description ends with the
-     "Українською" expand node, and customfield_10100 is not empty. If anything is wrong — fix it with editJiraIssue.
+     customfield_10600, responseContentFormat: adf) and confirm the body is in English, the description ends with the
+     "Українською" expand node, customfield_10100 is not empty, and customfield_10600 is set when it should be.
+     If anything is wrong — fix it with editJiraIssue.
    Title:
    - task: "[celery] <task_name> fails: <summary>"
    - API: "Exception on <endpoint> [METHOD] — <error message>"
@@ -110,6 +121,7 @@ ANALYSIS WINDOW: strictly the last 12 hours (from: now-12h, to: now). All Datado
    - No invented numbers: every number comes from a real query.
    - No personal data in tickets or the report (phone numbers — including sender numbers,
      emails, IPs, user ids, exact locations, commit author names/emails) — mask or aggregate.
+     The only exception: the source commit author's Atlassian account id, passed solely into the Developer №1 field.
    - Do not copy tokens, keys or authorization headers from stack traces or code.
    - If a Datadog, Jira or Bitbucket call fails (e.g. "requires approval" or auth) —
      do not guess results: state clearly in the report which call failed and with what error,
@@ -185,5 +197,6 @@ ANALYSIS WINDOW: strictly the last 12 hours (from: now-12h, to: now). All Datado
    in the session summary. After publishing, output the artifact URL.
 
 7. SESSION SUMMARY: product status, the report self-check result (pass, or the failing checks), list of 🔴/✅/🚫 with ticket
-   links, source tasks, the result of the ticket formatting check (language + expand + Component/s) and the artifact link.
+   links, source tasks, the result of the ticket formatting check (language + expand + Component/s + Developer: "set" or "not set — <reason>",
+   no names) and the artifact link.
 ```

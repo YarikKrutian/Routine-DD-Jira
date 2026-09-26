@@ -57,6 +57,10 @@ jira:
     max_tags: 5
     required: [backend, prod]       # + runtime (celery|uwsgi) + 1–2 тематичні теги
     existing_values_jql: "project = JIJI AND labels = auto-triage AND cf[10100] is not EMPTY ORDER BY created DESC"
+  developer:
+    field: customfield_10600        # "Developer №1", userpicker
+    source: commit_author           # author_account_id коміту-джерела з scripts/code_origin.py
+    min_confidence: medium          # high або medium — заповнюємо; low — поле порожнє
   cause_link:
     type: Problem/Incident          # новий баг "is caused by" задача-джерело
     min_confidence: medium          # high або medium — лінкуємо; low — лише згадка
