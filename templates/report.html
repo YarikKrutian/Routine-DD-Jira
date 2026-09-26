@@ -98,10 +98,10 @@
     "run_at_kyiv": "2026-09-26 20:57",
     "window": { "from_utc": "...", "to_utc": "...", "from_kyiv": "...", "to_kyiv": "..." },
     "status": { "level": "stable|watch|degraded", "rule": "...", "conclusion": "2–3 речення" },
-    "kpi": { "total_errors": 0, "patterns": 0, "new": 0, "covered": 0, "noise": 0 },
-    "hourly": [ { "hour_kyiv": "09:00", "count": 0 } ],          // 12 точок
+    "kpi": { "total_errors": 0, "patterns": 0, "new": 0, "covered": 0, "noise": 0 },   // new/covered/noise — К-СТЬ РЯДКІВ patterns[] цього класу; patterns = їх сума
+    "hourly": [ { "hour_kyiv": "08:57", "count": 0 } ],          // рівно 12 годинних кошиків від window.from (не календарні години); мітка — початок кошика, Київ
     "by_service": [ { "name": "celery", "count": 0 } ],
-    "by_country": [ { "name": "NG", "count": 0 } ],              // лише агрегати
+    "by_country": [ { "name": "NG", "count": 0 } ],              // лише агрегати; топ-6 + "Інші (N країн)" + "невідомо"; сума = total_errors
     "patterns": [ { "pattern": "...", "service": "...", "count": 0, "class": "new|covered|noise",
                     "jira": "JIJI-123"|null, "datadog_url": "<logs_explorer_url>"|null,
                     "source_task": "JIJI-456"|null, "confidence": "high|medium|low"|null, "note": "..."|null } ],
@@ -111,7 +111,8 @@
                      "status_thresholds": "...", "source_method": "...", "confidence_levels": "..." },
     "failed_calls": [ { "call": "...", "error": "..." } ]
   }
-  Числа — лише з реальних запитів. Без PII і секретів.
+  Числа — лише з реальних запитів. Без PII і секретів. Строгий JSON: без коментарів і хвостових ком.
+  Перед публікацією: python3 scripts/check_report.py <файл> (див. SKILL.md, розділ 6).
 -->
 <script id="report-data" type="application/json">
 {
@@ -119,7 +120,7 @@
   "run_at_kyiv": "2026-09-26 20:57",
   "window": { "from_utc": "2026-09-26 05:57", "to_utc": "2026-09-26 17:57", "from_kyiv": "2026-09-26 08:57", "to_kyiv": "2026-09-26 20:57" },
   "status": { "level": "watch", "rule": "1–2 нових 🔴 у вікні → 🟡 Watch", "conclusion": "Приклад висновку. З'явилась одна нова помилка в celery-тасці, решта патернів — відомі тікети або інфраструктурний шум. Загальний обсяг помилок у межах звичного." },
-  "kpi": { "total_errors": 1240, "patterns": 9, "new": 1, "covered": 3, "noise": 5 },
+  "kpi": { "total_errors": 1240, "patterns": 3, "new": 1, "covered": 1, "noise": 1 },
   "hourly": [
     {"hour_kyiv":"09:00","count":80},{"hour_kyiv":"10:00","count":95},{"hour_kyiv":"11:00","count":110},{"hour_kyiv":"12:00","count":102},
     {"hour_kyiv":"13:00","count":98},{"hour_kyiv":"14:00","count":140},{"hour_kyiv":"15:00","count":121},{"hour_kyiv":"16:00","count":105},
@@ -130,7 +131,7 @@
   "patterns": [
     {"pattern":"[celery] example_task fails: KeyError 'price'","service":"celery","count":310,"class":"new","jira":"JIJI-00001","datadog_url":null,"source_task":"JIJI-00000","confidence":"medium","note":null},
     {"pattern":"Exception on /api/example [GET] — ValueError","service":"uwsgi","count":220,"class":"covered","jira":"JIJI-00002","datadog_url":null,"source_task":null,"confidence":null,"note":null},
-    {"pattern":"ConnectionTimeout to Elasticsearch","service":"celery","count":400,"class":"noise","jira":null,"datadog_url":null,"source_task":null,"confidence":null,"note":"інфраструктурний шум"}
+    {"pattern":"Інфраструктурний шум (решта)","service":"celery + uwsgi","count":710,"class":"noise","jira":null,"datadog_url":null,"source_task":null,"confidence":null,"note":"Elasticsearch timeout 400, Redis/Valkey timeout 250, поодинокі (≤2 події) 60"}
   ],
   "created_tickets": [ {"key":"JIJI-00001","title":"[celery] example_task fails: KeyError 'price'","source_task":"JIJI-00000","confidence":"medium"} ],
   "over_limit": [],
@@ -195,6 +196,8 @@
 
   const st = STATUS[D.status?.level] || { t: "—", c: "var(--muted)" };
   const k = D.kpi || {};
+  const vol = c => (D.patterns || []).filter(p => p.class === c).reduce((a, p) => a + (p.count || 0), 0);
+  const volLabel = c => `<span class="l num">${fmt(vol(c))} подій</span>`;
   const m = D.methodology || {};
 
   app.innerHTML = `
@@ -219,9 +222,9 @@
     <div class="kpis">
       <div class="kpi"><span class="v">${fmt(k.total_errors)}</span><span class="l">помилок у вікні</span></div>
       <div class="kpi"><span class="v">${fmt(k.patterns)}</span><span class="l">патернів</span></div>
-      <div class="kpi"><span class="v" style="color:var(--red)">${fmt(k.new)}</span><span class="l">🔴 нових</span></div>
-      <div class="kpi"><span class="v" style="color:var(--green)">${fmt(k.covered)}</span><span class="l">✅ уже покрито</span></div>
-      <div class="kpi"><span class="v" style="color:var(--muted)">${fmt(k.noise)}</span><span class="l">🚫 інфра-шум</span></div>
+      <div class="kpi"><span class="v" style="color:var(--red)">${fmt(k.new)}</span><span class="l">🔴 нових (патернів)</span>${volLabel("new")}</div>
+      <div class="kpi"><span class="v" style="color:var(--green)">${fmt(k.covered)}</span><span class="l">✅ уже покрито (патернів)</span>${volLabel("covered")}</div>
+      <div class="kpi"><span class="v" style="color:var(--muted)">${fmt(k.noise)}</span><span class="l">🚫 інфра-шум (патернів)</span>${volLabel("noise")}</div>
     </div>
     <div class="grid2">
       <div class="panel"><h2>Помилки по годинах <span class="muted" style="font-weight:400">(Київ)</span></h2>${hourly(D.hourly)}</div>
