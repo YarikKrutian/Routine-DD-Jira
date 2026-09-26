@@ -105,7 +105,7 @@ ANALYSIS WINDOW: strictly the last 12 hours (from: now-12h, to: now). All Datado
    Do not edit or comment on the source task — only the link. Do not edit or comment on any other existing ticket either.
 
 5. CONSTRAINTS:
-   - At most 5 new tickets per run. If there are more candidates — create the 5
+   - At most 15 new tickets per run. If there are more candidates — create the 15
      with the highest counts and list the rest in the summary.
    - No invented numbers: every number comes from a real query.
    - No personal data in tickets or the report (phone numbers — including sender numbers,
@@ -129,7 +129,7 @@ ANALYSIS WINDOW: strictly the last 12 hours (from: now-12h, to: now). All Datado
       link to the Jira ticket (https://jijing.atlassian.net/browse/<KEY>), to Datadog
       (only the logs_explorer_url from the tool response), and for 🔴 — the source task and confidence.
    e) Tickets created in this run — a separate list with links and source tasks;
-      candidates over the limit of 5 — separately.
+      candidates over the limit of 15 — separately.
    f) Methodology: the exact query/filters, window, definition of every metric and status threshold,
       how the source was determined and what the confidence levels mean, the list of failed calls (if any).
    No PII or secrets on the page.
@@ -169,7 +169,7 @@ ANALYSIS WINDOW: strictly the last 12 hours (from: now-12h, to: now). All Datado
 
    REPORT SELF-CHECK — before publishing, save the page to a file and run both checks; fix and re-run until they pass:
    a) Numbers: recompute from your own data — the sums in the data rules above, KPI class counts = table rows per class,
-      status = thresholds applied to the 🔴 row count, ≤5 created tickets, no "≈"/"~N", no emails/IPs/phone numbers.
+      status = thresholds applied to the 🔴 row count, ≤15 created tickets, no "≈"/"~N", no emails/IPs/phone numbers.
    b) Layout: run this script (python3 check_layout.py <page.html>):
       import json, re, subprocess, sys, tempfile
       page = open(sys.argv[1], encoding="utf-8").read()

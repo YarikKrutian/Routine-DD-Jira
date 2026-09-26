@@ -26,7 +26,7 @@ import tempfile
 
 CHROMIUM_CANDIDATES = ["/opt/pw-browsers/chromium", "chromium", "chromium-browser", "google-chrome"]
 WIDTHS = (375, 1280)
-MAX_NEW_TICKETS = 5
+CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "triage.yaml")
 DATA_RE = re.compile(r'<script id="report-data" type="application/json">(.*?)</script>', re.S)
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
@@ -43,6 +43,15 @@ def walk_strings(node, key=None):
             yield from walk_strings(v, key)
     elif isinstance(node, str):
         yield key, node
+
+
+def max_new_tickets():
+    try:
+        with open(CONFIG, encoding="utf-8") as f:
+            m = re.search(r"^\s*max_new_tickets_per_run:\s*(\d+)", f.read(), re.M)
+    except OSError:
+        return None
+    return int(m.group(1)) if m else None
 
 
 def check_data(html, errors, warnings):
@@ -112,8 +121,11 @@ def check_data(html, errors, warnings):
         errors.append(f"status.level = {level!r}, but {n_new} new -> {expected!r}")
 
     created = d.get("created_tickets") or []
-    if len(created) > MAX_NEW_TICKETS:
-        errors.append(f"{len(created)} created tickets > limit {MAX_NEW_TICKETS}")
+    limit = max_new_tickets()
+    if limit is None:
+        warnings.append("limits.max_new_tickets_per_run not found in config/triage.yaml; ticket limit not checked")
+    elif len(created) > limit:
+        errors.append(f"{len(created)} created tickets > limit {limit}")
     new_keys = {p.get("jira") for p in patterns if p.get("class") == "new"}
     for t in created:
         if t.get("key") not in new_keys:
