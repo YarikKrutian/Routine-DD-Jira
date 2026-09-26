@@ -1,7 +1,7 @@
-# Параметри тріажу. Зміни тут — через PR; скіл читає значення звідси.
+# Triage parameters. Change them via PR; the skill reads its values from here.
 
 window:
-  # Строго останні 12 годин. Усі запити, статистика й цифри звіту — лише в цьому вікні.
+  # Strictly the last 12 hours. All queries, statistics and report numbers stay inside this window.
   from: now-12h
   to: now
   hourly_points: 12
@@ -12,18 +12,18 @@ datadog:
   patterns:
     use_log_patterns: true
     pattern_group_by: [service]
-  # Розбиття загальних патернів на кшталт "Exception on <wildcard endpoint>"
+  # Breakdown of generic patterns such as "Exception on <wildcard endpoint>"
   generic_breakdown:
     group_by: "@endpoint"
     clustering_pattern_field: "@error.message"
   stats:
     - total_error_logs
     - by_service
-    - by_country        # лише агрегати
-    - hourly            # window.hourly_points точок
+    - by_country        # aggregates only
+    - hourly            # window.hourly_points points
 
 classification:
-  # 🚫 Інфраструктурний шум — тікети НЕ створюються.
+  # 🚫 Infra noise — NO tickets.
   infra_noise:
     timeouts_to:
       - Elasticsearch
@@ -38,10 +38,10 @@ classification:
     isolated:
       - OperationalError
       - deadlock
-  # ✅ Уже покрито — знайдено тікет JQL-пошуком у project = JIJI за унікальним рядком помилки,
-  #    назвою таски або ендпоінтом; також перевірити label = auto-triage.
-  # 🔴 Нове — тікета немає. Закритий тікет + помилка повернулась з реальним обсягом = регресія
-  #    (новий тікет + зв'язок "Relates" на старий).
+  # ✅ Already covered — a ticket found by JQL search in project = JIJI for the unique error string,
+  #    task name or endpoint; also check label = auto-triage.
+  # 🔴 New — no ticket. A closed ticket + the error back at real volume = regression
+  #    (a new ticket + a "Relates" link to the old one).
   regression_link_type: Relates
 
 jira:
@@ -55,19 +55,19 @@ jira:
     field: customfield_10100
     min_tags: 3
     max_tags: 5
-    required: [backend, prod]       # + runtime (celery|uwsgi) + 1–2 тематичні теги
+    required: [backend, prod]       # + runtime (celery|uwsgi) + 1–2 topical tags
     existing_values_jql: "project = JIJI AND labels = auto-triage AND cf[10100] is not EMPTY ORDER BY created DESC"
   developer:
     field: customfield_10600        # "Developer №1", userpicker
-    source: commit_author           # author_account_id коміту-джерела з scripts/code_origin.py
-    min_confidence: medium          # high або medium — заповнюємо; low — поле порожнє
+    source: commit_author           # author_account_id of the source commit from scripts/code_origin.py
+    min_confidence: medium          # high or medium — fill it; low — leave empty
   cause_link:
-    type: Problem/Incident          # новий баг "is caused by" задача-джерело
-    min_confidence: medium          # high або medium — лінкуємо; low — лише згадка
+    type: Problem/Incident          # the new bug "is caused by" the source task
+    min_confidence: medium          # high or medium — link; low — mention only
   translation_expand_title: "Українською"
 
 limits:
-  max_new_tickets_per_run: 15       # решта кандидатів — у звіт як "понад ліміт"
+  max_new_tickets_per_run: 15       # the remaining candidates go to the report as "over the limit"
 
 bitbucket:
   workspace: cls-gentech
@@ -79,14 +79,14 @@ bitbucket:
   jira_key_regex: "JIJI-\\d+"
 
 status:
-  # Загальний стан продукту за кількістю нових 🔴 у вікні.
+  # Overall product status by the number of new 🔴 in the window.
   stable:   {emoji: "🟢", label: "Stable",   max_new: 0}
   watch:    {emoji: "🟡", label: "Watch",    max_new: 2}
   degraded: {emoji: "🔴", label: "Degraded", min_new: 3}
 
 report:
-  title_format: "Error triage {date} {ampm}"   # дата й AM/PM за Києвом
+  title_format: "Error triage {date} {ampm}"   # date and AM/PM in Kyiv time
   timezone: Europe/Kyiv
   icon: chart
-  language: uk
+  language: uk                  # the report page is in Ukrainian
   template: templates/report.html

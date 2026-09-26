@@ -92,16 +92,16 @@
 <main class="wrap" id="app"></main>
 
 <!--
-  ДАНІ ЗВІТУ. Рутина замінює лише вміст цього блоку. Схема:
+  REPORT DATA. The routine replaces only the contents of this block. Schema:
   {
-    "example": false,                         // true лише для демо-даних шаблону
+    "example": false,                         // true only for the template's demo data
     "run_at_kyiv": "2026-09-26 20:57",
     "window": { "from_utc": "...", "to_utc": "...", "from_kyiv": "...", "to_kyiv": "..." },
-    "status": { "level": "stable|watch|degraded", "rule": "...", "conclusion": "2–3 речення" },
-    "kpi": { "total_errors": 0, "patterns": 0, "new": 0, "covered": 0, "noise": 0 },   // new/covered/noise — К-СТЬ РЯДКІВ patterns[] цього класу; patterns = їх сума
-    "hourly": [ { "hour_kyiv": "08:57", "count": 0 } ],          // рівно 12 годинних кошиків від window.from (не календарні години); мітка — початок кошика, Київ
+    "status": { "level": "stable|watch|degraded", "rule": "...", "conclusion": "2–3 sentences" },
+    "kpi": { "total_errors": 0, "patterns": 0, "new": 0, "covered": 0, "noise": 0 },   // new/covered/noise — NUMBER OF patterns[] ROWS of that class; patterns = their sum
+    "hourly": [ { "hour_kyiv": "08:57", "count": 0 } ],          // exactly 12 one-hour buckets from window.from (not calendar hours); label = bucket start, Kyiv time
     "by_service": [ { "name": "celery", "count": 0 } ],
-    "by_country": [ { "name": "NG", "count": 0 } ],              // лише агрегати; топ-6 + "Інші (N країн)" + "невідомо"; сума = total_errors
+    "by_country": [ { "name": "NG", "count": 0 } ],              // aggregates only; top 6 + "Інші (N країн)" + "невідомо"; sum = total_errors
     "patterns": [ { "pattern": "...", "service": "...", "count": 0, "class": "new|covered|noise",
                     "jira": "JIJI-123"|null, "datadog_url": "<logs_explorer_url>"|null,
                     "source_task": "JIJI-456"|null, "confidence": "high|medium|low"|null, "note": "..."|null } ],
@@ -111,8 +111,8 @@
                      "status_thresholds": "...", "source_method": "...", "confidence_levels": "..." },
     "failed_calls": [ { "call": "...", "error": "..." } ]
   }
-  Числа — лише з реальних запитів. Без PII і секретів. Строгий JSON: без коментарів і хвостових ком.
-  Перед публікацією: python3 scripts/check_report.py <файл> (див. SKILL.md, розділ 6).
+  Numbers only from real queries. No PII or secrets. Strict JSON: no comments or trailing commas.
+  Before publishing: python3 scripts/check_report.py <file> (see SKILL.md, section 6).
 -->
 <script id="report-data" type="application/json">
 {

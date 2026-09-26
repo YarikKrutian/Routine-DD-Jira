@@ -1,40 +1,40 @@
 # Routine-DD-Jira
 
-Автоматичний тріаж продакшн-помилок Jiji: Datadog → класифікація → аналіз коду в Bitbucket → баг-тікети в Jira → HTML-звіт (Artifact).
-Запускається рутиною `datadog-jira-triage` двічі на день. Людини поруч немає — дій автономно, але обережно.
+Automated triage of Jiji production errors: Datadog → classification → code analysis in Bitbucket → bug tickets in Jira → HTML report (Artifact).
+Run by the `datadog-jira-triage` routine twice a day. No human is present — act autonomously but carefully.
 
-## Як запускати
-Порядок роботи — скіл `.claude/skills/triage/SKILL.md`. Параметри (запит, вікно, пороги, ліміти, шум) — `config/triage.yaml`.
-Не дублюй значення з конфігу в інших місцях — читай їх звідти.
+## How to run
+The workflow is the skill `.claude/skills/triage/SKILL.md`. Parameters (query, window, thresholds, limits, noise) live in `config/triage.yaml`.
+Do not duplicate config values elsewhere — read them from there.
 
-## Структура
-- `config/triage.yaml` — усі налаштовувані параметри.
-- `scripts/code_origin.py` — детермінований аналіз походження коду (blame / log -L / log -S / PR / Jira-ключі). Повертає JSON.
-- `scripts/check_report.py` — перевірка звіту перед публікацією: узгодженість цифр, PII, рендер у Chromium (375px і 1280px). Повертає JSON.
-- `templates/bug_ticket.adf.json` — каркас опису тікета в ADF.
-- `templates/report.html` — шаблон звіту; заповнюється лише JSON-блок з даними.
-- `ROUTINE_PROMPT.md` — короткий промпт рутини після підключення репозиторію.
-- `ROUTINE_PROMPT_STANDALONE.md` — повний автономний промпт, що зараз стоїть у рутині (поки репозиторій не підключено). Зміни правил дублювати туди й у рутину.
+## Layout
+- `config/triage.yaml` — all tunable parameters.
+- `scripts/code_origin.py` — deterministic code-origin analysis (blame / log -L / log -S / PR / Jira keys). Returns JSON.
+- `scripts/check_report.py` — pre-publish report check: number consistency, PII, Chromium render (375px and 1280px). Returns JSON.
+- `templates/bug_ticket.adf.json` — ADF skeleton of the ticket description.
+- `templates/report.html` — report template; only its JSON data block is filled in.
+- `ROUTINE_PROMPT.md` — short routine prompt for when the repository is attached.
+- `ROUTINE_PROMPT_STANDALONE.md` — full self-contained prompt currently set in the routine (until the repository is attached). Mirror every rule change there and in the routine.
 
-## Сталі значення
-- Jira: сайт `jijing.atlassian.net`, cloudId `4ae966c7-4f95-4aac-9ee7-24cee120152f`, проєкт `JIJI`.
-  Тип тікета — Bug, мітка `auto-triage`, Component/s — `customfield_10100` (labels-type),
-  Developer №1 — `customfield_10600` (userpicker, автор коміту-джерела).
-- Bitbucket: workspace `cls-gentech`, репозиторій — змінна оточення `BITBUCKET_REPO_SLUG`.
-  Доступ — `BITBUCKET_EMAIL` + `BITBUCKET_API_TOKEN` (Atlassian API token зі скоупом Bitbucket read).
+## Fixed values
+- Jira: site `jijing.atlassian.net`, cloudId `4ae966c7-4f95-4aac-9ee7-24cee120152f`, project `JIJI`.
+  Issue type Bug, label `auto-triage`, Component/s — `customfield_10100` (labels-type),
+  Developer №1 — `customfield_10600` (user picker, author of the source commit).
+- Bitbucket: workspace `cls-gentech`, repository from the `BITBUCKET_REPO_SLUG` environment variable.
+  Access — `BITBUCKET_EMAIL` + `BITBUCKET_API_TOKEN` (Atlassian API token with the Bitbucket read scope).
 
-## Жорсткі правила
-1. **Нічого не комітити й не пушити** — ні в цей репозиторій, ні в бекенд. Робота лише з Datadog, Jira, Bitbucket (read-only) та Artifact.
-2. **Секрети.** Ніколи не друкувати значення змінних оточення, не вставляти токен в URL, команди чи логи.
-   Для Bitbucket користуйся `scripts/code_origin.py` — він передає токен через credential helper і `urllib` basic auth.
-   Не копіювати токени, ключі чи authorization-заголовки зі стек-трейсів або коду.
-3. **Без PII** у тікетах, звіті й виводі сесії: телефони (зокрема номери відправників), email, IP, user id, точні локації,
-   імена/email/логіни авторів комітів — маскувати або агрегувати. У Datadog запитувати лише потрібні для тріажу поля, без ідентифікаторів користувачів.
-   Єдиний виняток — Atlassian account id автора коміту-джерела (`author_account_id` з `scripts/code_origin.py`):
-   його можна лише передати в поле Developer №1 тікета, але не писати в текст тікета, звіт чи вивід сесії.
-4. **Без вигаданих цифр.** Кожне число — з реального запиту в межах вікна аналізу. Цифри мають узгоджуватися між собою.
-5. **Посилання на Datadog** — лише `logs_explorer_url` з відповіді інструмента, ніколи не збирати URL вручну.
-6. **Збої викликів.** Якщо виклик Datadog/Jira/Bitbucket падає (auth, "requires approval" тощо) — не вгадувати результат:
-   чітко вказати у звіті, який виклик і з якою помилкою, а розділи без даних позначити "no data".
-   Немає доступу до Bitbucket — пропустити аналіз коду, у тікеті й звіті написати "Code origin: no access to Bitbucket" і продовжити.
-7. **Не редагувати й не коментувати** чужі тікети — лише створювати зв'язки, описані в скілі.
+## Hard rules
+1. **Do not commit or push** — neither to this repository nor to the backend. Work only with Datadog, Jira, Bitbucket (read-only) and Artifact.
+2. **Secrets.** Never print environment variable values; never put the token in URLs, commands or logs.
+   For Bitbucket use `scripts/code_origin.py` — it passes the token through a credential helper and `urllib` basic auth.
+   Do not copy tokens, keys or authorization headers from stack traces or code.
+3. **No PII** in tickets, the report or session output: phone numbers (including sender numbers), emails, IPs, user ids, exact locations,
+   names/emails/logins of commit authors — mask or aggregate. Query Datadog only for the fields triage needs, with no user identifiers.
+   The only exception is the Atlassian account id of the source commit's author (`author_account_id` from `scripts/code_origin.py`):
+   it may only be passed into the ticket's Developer №1 field, never written into ticket text, the report or session output.
+4. **No invented numbers.** Every number comes from a real query within the analysis window. Numbers must be consistent with each other.
+5. **Datadog links** — only the `logs_explorer_url` from the tool response; never build the URL by hand.
+6. **Failed calls.** If a Datadog/Jira/Bitbucket call fails (auth, "requires approval", etc.) — do not guess the result:
+   state in the report which call failed and with what error, and mark sections without data as "no data".
+   No Bitbucket access — skip code analysis, write "Code origin: no access to Bitbucket" in the ticket and the report, and continue.
+7. **Do not edit or comment on** other tickets — only create the links described in the skill.

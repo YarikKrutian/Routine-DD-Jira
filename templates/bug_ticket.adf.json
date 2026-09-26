@@ -1,5 +1,5 @@
 {
-  "_comment": "Каркас опису баг-тікета (contentFormat: adf). Заміни {{...}}, прибери це поле. Секції — рівно ці, без додаткових. Останній top-level вузол — expand 'Українською' з перекладом УСІХ секцій. Для low-confidence Code origin пише 'possible source'; без доступу до Bitbucket — 'Code origin: no access to Bitbucket'.",
+  "_comment": "Bug ticket description skeleton (contentFormat: adf). Replace {{...}} and remove this field. Exactly these sections, no extra ones. The last top-level node is the 'Українською' expand with a translation of ALL sections. For low confidence Code origin says 'possible source'; without Bitbucket access — 'Code origin: no access to Bitbucket'.",
   "type": "doc",
   "version": 1,
   "content": [
@@ -83,7 +83,7 @@
       "type": "expand",
       "attrs": { "title": "Українською" },
       "content": [
-        { "type": "paragraph", "content": [{ "type": "text", "text": "{{Переклад усіх секцій вище: абзац, Datadog evidence, посилання, Trace (codeBlock можна повторити), Code origin, Root cause, Impact, примітка про авто-створення}}" }] }
+        { "type": "paragraph", "content": [{ "type": "text", "text": "{{Ukrainian translation of all sections above: paragraph, Datadog evidence, link, Trace (the codeBlock may be repeated), Code origin, Root cause, Impact, auto-created note}}" }] }
       ]
     }
   ]
