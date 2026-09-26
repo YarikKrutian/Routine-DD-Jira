@@ -1,148 +1,148 @@
 ---
 name: triage
-description: Автоматичний тріаж продакшн-помилок Jiji з Datadog (celery/uwsgi) — класифікація патернів, аналіз походження коду в Bitbucket, створення баг-тікетів у Jira та публікація HTML-звіту. Використовуй, коли рутина або користувач просить "run", "triage" чи перевірити помилки в Datadog.
+description: Automated triage of Jiji production errors from Datadog (celery/uwsgi) — pattern classification, code-origin analysis in Bitbucket, Jira bug tickets and an HTML report. Use when the routine or the user asks to "run", "triage" or check Datadog errors.
 ---
 
-# Тріаж помилок Datadog → Jira
+# Datadog → Jira error triage
 
-Перед початком прочитай `config/triage.yaml` — далі на нього посилання як `cfg.*`.
-Загальні правила (секрети, PII, збої викликів) — у `CLAUDE.md`, вони діють на кожному кроці.
+Before starting, read `config/triage.yaml` — referred to below as `cfg.*`.
+General rules (secrets, PII, failed calls) are in `CLAUDE.md`; they apply at every step.
 
 ## 1. Datadog
-Спочатку виконай discovery скілів Datadog MCP (`load_datadog_skill` `datadog/logs` + `list_datadog_skills`).
+First run Datadog MCP skill discovery (`load_datadog_skill` `datadog/logs` + `list_datadog_skills`).
 
-Вікно — `cfg.window` (from/to). Жоден запит і жодне порівняння поза вікном.
+The window is `cfg.window` (from/to). No query and no comparison outside it.
 
-1. Патерни: запит `cfg.datadog.query`, `use_log_patterns: true`, `pattern_group_by: cfg.datadog.patterns.pattern_group_by`.
-2. Загальні патерни (напр. `Exception on <wildcard endpoint>`) розбий: group by `@endpoint`,
+1. Patterns: query `cfg.datadog.query`, `use_log_patterns: true`, `pattern_group_by: cfg.datadog.patterns.pattern_group_by`.
+2. Break down generic patterns (e.g. `Exception on <wildcard endpoint>`): group by `@endpoint`,
    `clustering_pattern_field = @error.message`.
-3. Запитуй лише поля, потрібні для тріажу; без ідентифікаторів користувачів.
-4. Статистика (той самий фільтр і вікно):
-   - загальна кількість error-логів;
-   - розбивка за service і за country (лише агрегати);
-   - погодинний розподіл (`cfg.window.hourly_points` точок).
+3. Request only the fields triage needs; no user identifiers.
+4. Statistics (same filter and window):
+   - total number of error logs;
+   - breakdown by service and by country (aggregates only);
+   - hourly distribution (`cfg.window.hourly_points` points).
 
-Зберігай `logs_explorer_url` з кожної відповіді — вони знадобляться для тікетів і звіту.
+Keep the `logs_explorer_url` from every response — tickets and the report need them.
 
-## 2. Класифікація кожного патерну
-- 🚫 **Infra noise** — усе зі списку `cfg.classification.infra_noise` (таймаути до ES, Redis/Valkey, Mongo, Telegram, Intercom,
-  сторонніх API; `SoftTimeLimitExceeded`/`TimeLimitExceeded`; поодинокі `OperationalError`/deadlock). Тікети **не** створюються.
-- ✅ **Already covered** — знайдено наявний тікет: JQL текстовий пошук у `project = JIJI` за унікальним рядком помилки,
-  назвою таски або ендпоінтом; також перевір `label = auto-triage`.
-- 🔴 **New** — тікета немає. Якщо є закритий тікет, а помилка повернулась з реальним обсягом — це **регресія**:
-  новий тікет з посиланням на старий (зв'язок `Relates` + згадка в тексті).
+## 2. Classify each pattern
+- 🚫 **Infra noise** — anything in `cfg.classification.infra_noise` (timeouts to ES, Redis/Valkey, Mongo, Telegram, Intercom,
+  third-party APIs; `SoftTimeLimitExceeded`/`TimeLimitExceeded`; isolated `OperationalError`/deadlock). **No** tickets.
+- ✅ **Already covered** — an existing ticket was found: JQL text search in `project = JIJI` for the unique error string,
+  task name or endpoint; also check `label = auto-triage`.
+- 🔴 **New** — no ticket. If a closed ticket exists and the error is back at real volume, it is a **regression**:
+  a new ticket referencing the old one (a `Relates` link + a mention in the text).
 
-## 3. Аналіз коду (для кожного 🔴, до створення тікета)
-Використовуй `scripts/code_origin.py` (див. `--help`). Він сам клонує репозиторій, обирає ref, робить blame/log і тягне PR,
-не показуючи токен. Про автора коміту повертає лише `author_account_id` (Atlassian account id) — без імені, email чи логіна.
+## 3. Code analysis (for each 🔴, before creating the ticket)
+Use `scripts/code_origin.py` (see `--help`). It clones the repository, picks the ref, runs blame/log and fetches PRs
+without exposing the token. About the commit author it returns only `author_account_id` (Atlassian account id) — no name, email or login.
 
-a) Зі стек-трейсу візьми найглибший кадр у коді проєкту (не site-packages/stdlib): файл, рядок, функція.
-   Немає стек-трейсу (прямий `log.error` чи repr) — візьми logger/funcName/module з логу і знайди код через `--search "<унікальний текст>"`.
-b) Версію бери з тегу Datadog `version` → `--version`. Скрипт повідомить, чи знайдено ref, чи використано main (`ref_fallback`) — вкажи це.
-c) `--file F --line N [--function FN]` — blame ±5 рядків і `git log -L` для функції. За потреби додай `--search "<рядок помилки>"`.
-d) Для знайденого коміту скрипт повертає short SHA, дату, повідомлення, PR і Jira-ключі (`JIJI-\d+` з повідомлення, гілки, назви PR).
-   **Перевір кожен ключ** через `getJiraIssue` (чи існує, про що).
-e) Оціни впевненість:
-   - **high** — коміт безпосередньо змінив рядок, що падає, і знайдено Jira-ключ;
-   - **medium** — коміт змінив ту саму функцію / сусідню логіку;
-   - **low** — лише непрямі ознаки.
-   Не вигадуй зв'язок: якщо нічого переконливого — так і скажи. Якщо причина явно поза кодом (налаштування стороннього сервісу, дані партнера) — так і скажи.
-f) Не записуй імена, email чи логіни авторів комітів — лише SHA, дату, PR і Jira-ключ.
-   `author_account_id` коміту-джерела використовуй тільки для поля Developer (див. розділ 4) — не виводь його в текст тікета, звіт чи підсумок.
+a) From the stack trace take the deepest frame in project code (not site-packages/stdlib): file, line, function.
+   No stack trace (a direct `log.error` or a repr) — take logger/funcName/module from the log and find the code with `--search "<unique text>"`.
+b) Take the version from the Datadog `version` tag → `--version`. The script reports whether the ref was found or main was used (`ref_fallback`) — say so.
+c) `--file F --line N [--function FN]` — blame ±5 lines and `git log -L` for the function. Add `--search "<error string>"` if needed.
+d) For each commit the script returns short SHA, date, message, PRs and Jira keys (`JIJI-\d+` from the message, branch and PR title).
+   **Verify every key** with `getJiraIssue` (exists, what it is about).
+e) Rate confidence:
+   - **high** — the commit directly changed the failing line and a Jira key was found;
+   - **medium** — the commit changed the same function / nearby logic;
+   - **low** — only indirect signs.
+   Do not invent a connection: if nothing is convincing, say so. If the cause is clearly outside the code (third-party service settings, partner data), say so.
+f) Do not record names, emails or logins of commit authors — only SHA, date, PR and Jira key.
+   Use the source commit's `author_account_id` only for the Developer field (see section 4) — never output it in ticket text, the report or the summary.
 
-Якщо скрипт повертає `"error": "no_access"` — "Code origin: no access to Bitbucket" і далі за планом.
+If the script returns `"error": "no_access"` — "Code origin: no access to Bitbucket" and carry on.
 
-## 4. Тікети (лише для 🔴)
-Проєкт `JIJI`, тип Bug, мітка `auto-triage`.
+## 4. Tickets (🔴 only)
+Project `JIJI`, type Bug, label `auto-triage`.
 
-**Перед першим `createJiraIssue`** завантаж скіл `jira-bug-report-rules` через Skill. Правила нижче діють незалежно від того, чи він завантажився.
+**Before the first `createJiraIssue`** load the `jira-bug-report-rules` skill via Skill. The rules below apply whether or not it loads.
 
-### Обов'язкове форматування
-- **Мова:** заголовок і все тіло — англійською. Останній вузол опису — український переклад УСЬОГО тіла в **згорнутому** блоці.
-  Створюй і редагуй з `contentFormat: "adf"`; останній top-level вузол:
+### Mandatory formatting
+- **Language:** title and entire body in English. The last node of the description is a Ukrainian translation of the WHOLE body in a **collapsed** block.
+  Create and edit with `contentFormat: "adf"`; the last top-level node:
   `{"type":"expand","attrs":{"title":"Українською"},"content":[...]}`.
-  Не використовуй wiki-розмітку `{expand}` чи HTML `<details>` — Jira Cloud їх не згортає.
-  Блок перекладу обов'язковий і не вважається "зайвою секцією".
-- **Component/s:** завжди заповнюй `customfield_10100` — 3–5 тегів у нижньому регістрі: `backend`, `prod`, runtime (`celery` або `uwsgi`)
-  та 1–2 тематичні теги модуля/фічі. Перед першим тікетом подивись наявні значення: `cfg.jira.components.existing_values_jql`.
-- **Developer №1** (`cfg.jira.developer.field`, userpicker): автор коміту, який у Code origin названо джерелом.
-  Лише при впевненості **high/medium** і непорожньому `author_account_id` цього коміту — передай у `createJiraIssue`
-  через `additional_fields`: `{"customfield_10600": {"accountId": "<author_account_id>"}}`.
-  При **low**, без доступу до Bitbucket чи з `author_error` — поле не заповнюй і вкажи причину в підсумку ("Developer: not set — <причина>").
-  Якщо Jira відхиляє створення через це поле — створи тікет без нього й так само вкажи причину. Assignee не чіпай.
-- **Перевірка:** після створення кожного тікета — `getJiraIssue` (fields: `description`, `customfield_10100`, `customfield_10600`, `responseContentFormat: adf`).
-  Переконайся: тіло англійською, опис закінчується вузлом expand "Українською", `customfield_10100` не порожнє,
-  `customfield_10600` заповнене, якщо мало бути (accountId збігається). Якщо щось не так — виправ `editJiraIssue`.
+  Do not use `{expand}` wiki markup or HTML `<details>` — Jira Cloud does not collapse them.
+  The translation block is mandatory and does not count as an "extra section".
+- **Component/s:** always fill `customfield_10100` — 3–5 lowercase tags: `backend`, `prod`, the runtime (`celery` or `uwsgi`)
+  and 1–2 topical tags for the module/feature. Before the first ticket look at existing values: `cfg.jira.components.existing_values_jql`.
+- **Developer №1** (`cfg.jira.developer.field`, user picker): the author of the commit named as the source in Code origin.
+  Only with **high/medium** confidence and a non-empty `author_account_id` for that commit — pass it to `createJiraIssue`
+  via `additional_fields`: `{"customfield_10600": {"accountId": "<author_account_id>"}}`.
+  With **low** confidence, no Bitbucket access or an `author_error` — leave it empty and give the reason in the summary ("Developer: not set — <reason>").
+  If Jira rejects the create because of this field — create the ticket without it and give the reason. Do not touch the assignee.
+- **Verification:** after creating each ticket — `getJiraIssue` (fields: `description`, `customfield_10100`, `customfield_10600`, `responseContentFormat: adf`).
+  Confirm: body in English, the description ends with the "Українською" expand node, `customfield_10100` is not empty,
+  `customfield_10600` is set when it should be (accountId matches). If anything is wrong — fix it with `editJiraIssue`.
 
-### Заголовок
-- таска: `[celery] <task_name> fails: <summary>`
+### Title
+- task: `[celery] <task_name> fails: <summary>`
 - API: `Exception on <endpoint> [METHOD] — <error message>`
 
-### Тіло
-Каркас — `templates/bug_ticket.adf.json`: заміни плейсхолдери `{{...}}`, прибери службове поле `_comment`.
-Рівно ці секції, жодних інших (+ згорнутий переклад наприкінці):
-1. Абзац: що падає, точна помилка, env/version.
-2. **Datadog evidence**: service, таска/ендпоінт, кількість і вікно, хости/країни (лише prod), версія. Цифри узгоджені між собою.
-3. Link — ЛИШЕ `logs_explorer_url` з відповіді інструмента.
-4. **Trace** — code block зі стек-трейсом (без токенів і PII).
-5. **Code origin**: file:line і функція; коміт (short SHA + посилання `cfg.bitbucket.commit_url`), дата, PR (посилання з відповіді API),
-   Jira-задача, в якій це реалізовано; впевненість high/medium/low з обґрунтуванням в одне речення; ref, на якому робився аналіз.
-6. **Root cause** — гіпотеза, явно позначена як гіпотеза (на основі Code origin).
-7. **Impact** — які флоу, скільки країн, з якого часу.
-8. Наприкінці: _Auto-created by the Datadog error-triage routine for review._
-9. Далі — expand "Українською" з перекладом усіх секцій вище.
+### Body
+Skeleton — `templates/bug_ticket.adf.json`: replace the `{{...}}` placeholders and remove the `_comment` field.
+Exactly these sections, no others (+ the collapsed translation at the end):
+1. A paragraph: what fails, the exact error, env/version.
+2. **Datadog evidence**: service, task/endpoint, count and window, hosts/countries (prod only), version. Numbers consistent with each other.
+3. Link — ONLY the `logs_explorer_url` from the tool response.
+4. **Trace** — a code block with the stack trace (no tokens or PII).
+5. **Code origin**: file:line and function; commit (short SHA + link `cfg.bitbucket.commit_url`), date, PR (link from the API response),
+   the Jira task in which it was implemented; confidence high/medium/low with a one-sentence justification; the ref the analysis ran on.
+6. **Root cause** — a hypothesis, explicitly marked as a hypothesis (based on Code origin).
+7. **Impact** — which flows, how many countries, since when.
+8. At the end: _Auto-created by the Datadog error-triage routine for review._
+9. Then the "Українською" expand with the translation of all the sections above.
 
-Не додавай секцій на кшталт "Possible next step", "Suggested fix" чи рекомендацій.
+Do not add sections like "Possible next step", "Suggested fix" or recommendations.
 
-### Зв'язки
-- Впевненість **high/medium** і задача-джерело існує → `createIssueLink` типу `Problem/Incident`, щоб новий баг "is caused by" джерело:
-  `inwardIssue` = задача-джерело, `outwardIssue` = новий баг. Потім перевір напрямок через `getJiraIssue` і виправ, якщо не той.
-- **low** → не лінкувати, лише згадати задачу в Code origin як "possible source".
-- Регресія → додатково `Relates` на старий закритий тікет.
-- Не редагуй і не коментуй задачу-джерело — лише зв'язок.
+### Links
+- **high/medium** confidence and the source task exists → `createIssueLink` of type `Problem/Incident` so that the new bug "is caused by" the source:
+  `inwardIssue` = source task, `outwardIssue` = new bug. Then verify the direction with `getJiraIssue` and fix it if wrong.
+- **low** → no link, only mention the task in Code origin as a "possible source".
+- Regression → additionally `Relates` to the old closed ticket.
+- Do not edit or comment on the source task — only the link.
 
-## 5. Обмеження
-- Не більше `cfg.limits.max_new_tickets_per_run` (15) нових тікетів за запуск. Якщо кандидатів більше — створи 15 з найбільшими count,
-  решту перелічи у звіті й підсумку.
-- Решта обмежень (цифри, PII, секрети, збої викликів) — `CLAUDE.md`.
+## 5. Limits
+- At most `cfg.limits.max_new_tickets_per_run` (15) new tickets per run. If there are more candidates — create the 15 with the highest counts
+  and list the rest in the report and the summary.
+- Other constraints (numbers, PII, secrets, failed calls) — `CLAUDE.md`.
 
-## 6. Звіт (Artifact)
-Не проєктуй сторінку з нуля і не верстай HTML вручну — лише `templates/report.html`.
-(Звіти 25.09 PM і 26.09 PM зверстані вручну, у кожного свій дизайн; верстку 26.09 PM довелося лагодити вже після публікації.)
-1. Скопіюй шаблон у scratchpad як `error-triage-<YYYY-MM-DD>-<am|pm>.html` (новий файл на кожен запуск → новий артефакт).
-2. Заміни `{{TITLE}}` у `<title>` на `Error triage <YYYY-MM-DD> <AM|PM>` (час Києва).
-3. Заміни вміст `<script id="report-data" type="application/json">` на реальні дані за схемою, описаною в коментарі над ним.
-   Решту розмітки, CSS і скриптів не змінюй. Потрібне поле, якого немає в схемі, — у `note` чи `methodology`, а не новою розміткою.
-4. Перевір: `python3 scripts/check_report.py <файл> --screenshots <scratchpad>/shots`.
-   Помилки в даних → виправ дані й запусти ще раз. Публікуй лише при `"ok": true`.
-   Якщо після двох виправлень помилки лишились — опублікуй, але кожну помилку внеси у `failed_calls` (`call: "check_report"`) і в підсумок сесії.
-5. Опублікуй через Artifact з `icon: "chart"` і коротким `description`. Виведи URL.
+## 6. Report (Artifact)
+Do not design the page from scratch or hand-write the HTML — use only `templates/report.html`.
+(The 25.09 PM and 26.09 PM reports were laid out by hand, each with its own design; the 26.09 PM layout had to be fixed after publishing.)
+1. Copy the template to the scratchpad as `error-triage-<YYYY-MM-DD>-<am|pm>.html` (a new file per run → a new artifact).
+2. Replace `{{TITLE}}` in `<title>` with `Error triage <YYYY-MM-DD> <AM|PM>` (Kyiv time).
+3. Replace the contents of `<script id="report-data" type="application/json">` with real data following the schema in the comment above it.
+   Do not change the rest of the markup, CSS or scripts. A field the schema lacks goes into `note` or `methodology`, not new markup.
+4. Check: `python3 scripts/check_report.py <file> --screenshots <scratchpad>/shots`.
+   Data errors → fix the data and rerun. Publish only on `"ok": true`.
+   If errors remain after two fixes — publish anyway, but add each error to `failed_calls` (`call: "check_report"`) and to the session summary.
+5. Publish via Artifact with `icon: "chart"` and a short `description`. Output the URL.
 
-### Правила даних звіту
-Складені за звітами 25.09 PM і 26.09 PM; `check_report.py` перевіряє їх автоматично.
-- **Одна одиниця на метрику.** `kpi.new` / `kpi.covered` / `kpi.noise` — кількість **рядків** таблиці цього класу, `kpi.patterns` — їхня сума.
-  Кількість подій за класом шаблон рахує сам із `patterns[].count`. (У 26.09 PM плитка «🚫 144» показувала події, а поруч 🔴 2 / ✅ 7 — патерни.)
-- **Усе сходиться до `kpi.total_errors`:** сума `by_service`, сума `by_country`, сума `hourly` і сума `patterns[].count` дорівнюють загальній кількості.
-  - Таблиця: виміряні патерни окремими рядками + один рядок `Інфраструктурний шум (решта)` класу `noise` = total − сума решти рядків.
-    У `note` цього рядка — лише точні підкатегорії з окремих запитів у тому ж вікні; неміряну частину пиши як «поодинокі (≤N подій)» без числа-оцінки.
-  - Країни: топ-6 + `Інші (N країн)`; логи без тегу країни — окремий рядок `невідомо`.
-- **Погодинний графік — рівно 12 кошиків** по годині від `window.from` (напр. 08:57–09:57), мітка — початок кошика за Києвом.
-  Не календарні години: вікно не вирівняне по годині, тому календарні дають 13 точок і часткові крайні стовпці (як в обох звітах).
-- **Кожен рядок таблиці має реальну кількість > 0 у вікні.** Тікет, чий патерн у вікні не з'являвся, — не рядок таблиці
-  (у 25.09 PM два ✅ рядки були з «—»). За потреби згадай його в `methodology`.
-- **Без наближень:** жодних `≈`, `~N`, «близько». Немає точного числа — не пиши число.
-- **Узгодженість між розділами:** сервіс, кількість і країни патерну однакові в таблиці, у `created_tickets`, у висновку статусу і в самому тікеті
-  (у 26.09 PM Twilio був `celery` у таблиці й `celery + uwsgi` у списку тікетів). Кожен ключ із `created_tickets` — рядок класу `new` у таблиці.
-- **`status.level`** рахується лише з кількості рядків `new` за `cfg.status`; `status.rule` називає правило, `conclusion` — 2–3 речення з тими самими числами, що й у таблиці.
-- **`datadog_url`** — `logs_explorer_url` того запиту, яким порахована кількість цього рядка. Немає окремого запиту — `null`, а не URL іншого рядка.
-- **Строгий JSON:** без коментарів і хвостових ком; `</` усередині рядків пиши як `<\/`. Бита JSON-структура = порожня сторінка.
-- Без PII і секретів (скрипт додатково ловить email, IPv4 і номери, схожі на телефонні).
+### Report data rules
+Derived from the 25.09 PM and 26.09 PM reports; `check_report.py` checks them automatically.
+- **One unit per metric.** `kpi.new` / `kpi.covered` / `kpi.noise` are the number of table **rows** of that class; `kpi.patterns` is their sum.
+  The template computes per-class event volume from `patterns[].count`. (In 26.09 PM the "🚫 144" tile showed events while 🔴 2 / ✅ 7 next to it were patterns.)
+- **Everything adds up to `kpi.total_errors`:** the sums of `by_service`, `by_country`, `hourly` and `patterns[].count` all equal the total.
+  - Table: measured patterns as separate rows + one `Інфраструктурний шум (решта)` row of class `noise` = total − sum of the other rows.
+    Its `note` lists only exact sub-counts from separate queries in the same window; write the unmeasured part as «поодинокі (≤N подій)» without an estimated number.
+  - Countries: top 6 + `Інші (N країн)`; logs without a country tag — a separate `невідомо` row.
+- **Hourly chart — exactly 12 one-hour buckets** from `window.from` (e.g. 08:57–09:57), labelled with the bucket start in Kyiv time.
+  Not calendar hours: the window is not hour-aligned, so calendar hours give 13 points with partial edge bars (as in both reports).
+- **Every table row has a real count > 0 in the window.** A ticket whose pattern did not occur in the window is not a table row
+  (in 25.09 PM two ✅ rows showed «—»). Mention it in `methodology` if needed.
+- **No approximations:** no `≈`, `~N`, «близько». No exact number — no number.
+- **Consistency across sections:** a pattern's service, count and countries are the same in the table, in `created_tickets`, in the status conclusion and in the ticket itself
+  (in 26.09 PM Twilio was `celery` in the table and `celery + uwsgi` in the ticket list). Every key in `created_tickets` is a `new` row in the table.
+- **`status.level`** is computed only from the number of `new` rows using `cfg.status`; `status.rule` names the rule; `conclusion` is 2–3 sentences with the same numbers as the table.
+- **`datadog_url`** is the `logs_explorer_url` of the query that produced that row's count. No separate query — `null`, not another row's URL.
+- **Strict JSON:** no comments or trailing commas; write `</` inside strings as `<\/`. Broken JSON = an empty page.
+- No PII or secrets (the script also catches emails, IPv4 addresses and phone-like numbers).
 
-Зміст сторінки (формує шаблон з даних): вікно (UTC і Київ), час запуску; статус продукту + правило + висновок;
-KPI, погодинний графік, розбивка за service і country; таблиця патернів з посиланнями на Jira й Datadog, для 🔴 — джерело й впевненість;
-створені тікети; кандидати понад ліміт; методологія (точний запит/фільтри, вікно, визначення кожної метрики й порогів статусу,
-як визначалось джерело і що означають рівні впевненості, список збоїв викликів). Сторінка українською.
+Page content (the template builds it from the data): window (UTC and Kyiv), run time; product status + rule + conclusion;
+KPIs, hourly chart, breakdown by service and country; pattern table with Jira and Datadog links, and for 🔴 the source and confidence;
+created tickets; candidates over the limit; methodology (exact query/filters, window, definition of every metric and status threshold,
+how the source was determined and what the confidence levels mean, list of failed calls). The page is in Ukrainian.
 
-## 7. Підсумок сесії
-Статус продукту; результат `check_report.py` (ok або перелік помилок); список 🔴/✅/🚫 з посиланнями на тікети; задачі-джерела; результат перевірки форматування тікетів
-(мова + expand + Component/s + Developer: "set" або "not set — <причина>", без імен); посилання на артефакт.
+## 7. Session summary
+Product status; `check_report.py` result (ok or the list of errors); list of 🔴/✅/🚫 with ticket links; source tasks; ticket formatting check result
+(language + expand + Component/s + Developer: "set" or "not set — <reason>", no names); artifact link.

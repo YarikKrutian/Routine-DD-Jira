@@ -1,13 +1,13 @@
-# Промпт рутини `datadog-jira-triage`
+# `datadog-jira-triage` routine prompt
 
-Текст, який має стояти в рутині після того, як до неї (або до її середовища) буде підключено цей репозиторій як джерело.
-Уся логіка — у `CLAUDE.md`, `.claude/skills/triage/SKILL.md` і `config/triage.yaml`; промпт лише запускає її.
+The text to set in the routine once this repository is attached to it (or to its environment) as a source.
+All logic lives in `CLAUDE.md`, `.claude/skills/triage/SKILL.md` and `config/triage.yaml`; the prompt only starts it.
 
-Налаштування, які лишаються в самій рутині (не в репозиторії):
-- розклад: `CRON_TZ=Europe/Kyiv 57 8,20 * * *`;
-- конектори: Atlassian, Datadog, JIJI-MCP-portal;
-- змінні оточення середовища: `BITBUCKET_REPO_SLUG`, `BITBUCKET_EMAIL`, `BITBUCKET_API_TOKEN`;
-- сповіщення: push.
+Settings that stay in the routine itself (not in the repository):
+- schedule: `CRON_TZ=Europe/Kyiv 57 8,20 * * *`;
+- connectors: Atlassian, Datadog, JIJI-MCP-portal;
+- environment variables: `BITBUCKET_REPO_SLUG`, `BITBUCKET_EMAIL`, `BITBUCKET_API_TOKEN`;
+- notifications: push.
 
 ---
 

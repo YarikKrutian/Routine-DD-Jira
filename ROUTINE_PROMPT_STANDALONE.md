@@ -1,14 +1,14 @@
-# Автономний промпт рутини `datadog-jira-triage` (тимчасовий)
+# Standalone `datadog-jira-triage` routine prompt (temporary)
 
-Діє, **поки репозиторій не підключено до рутини**: рутина не бачить `CLAUDE.md`, скіл, конфіг, шаблони й скрипти,
-тому всі правила продубльовано в тексті промпту нижче.
+In effect **until the repository is attached to the routine**: the routine cannot see `CLAUDE.md`, the skill, the config, templates or scripts,
+so every rule is duplicated in the prompt text below.
 
-Правило синхронізації: будь-яка зміна правил у `CLAUDE.md`, `.claude/skills/triage/SKILL.md`, `config/triage.yaml`
-чи `templates/` має бути внесена і сюди, і в промпт самої рутини (через `update_trigger`).
-Після підключення репозиторію рутина переходить на короткий `ROUTINE_PROMPT.md`, а цей файл видаляється.
+Sync rule: any rule change in `CLAUDE.md`, `.claude/skills/triage/SKILL.md`, `config/triage.yaml`
+or `templates/` must be made both here and in the routine's own prompt (via `update_trigger`).
+Once the repository is attached, the routine switches to the short `ROUTINE_PROMPT.md` and this file is deleted.
 
-Відмінності від репозиторної версії: без шаблону `templates/report.html` і `scripts/check_report.py`
-звіт верстається вручну за правилами верстки з кроку 6, а перевірка — вбудованим скриптом у тому ж кроці.
+Differences from the repository version: without `templates/report.html` and `scripts/check_report.py`
+the report is laid out by hand following the layout rules in step 6, and checked with the script embedded in the same step.
 
 ---
 
