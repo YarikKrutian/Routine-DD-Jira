@@ -1,0 +1,88 @@
+# Параметри тріажу. Зміни тут — через PR; скіл читає значення звідси.
+
+window:
+  # Строго останні 12 годин. Усі запити, статистика й цифри звіту — лише в цьому вікні.
+  from: now-12h
+  to: now
+  hourly_points: 12
+
+datadog:
+  query: "status:error service:(celery OR uwsgi) -env:jiji-dev*"
+  services: [celery, uwsgi]
+  patterns:
+    use_log_patterns: true
+    pattern_group_by: [service]
+  # Розбиття загальних патернів на кшталт "Exception on <wildcard endpoint>"
+  generic_breakdown:
+    group_by: "@endpoint"
+    clustering_pattern_field: "@error.message"
+  stats:
+    - total_error_logs
+    - by_service
+    - by_country        # лише агрегати
+    - hourly            # window.hourly_points точок
+
+classification:
+  # 🚫 Інфраструктурний шум — тікети НЕ створюються.
+  infra_noise:
+    timeouts_to:
+      - Elasticsearch
+      - Redis/Valkey
+      - Mongo
+      - Telegram
+      - Intercom
+      - third-party APIs
+    exceptions:
+      - SoftTimeLimitExceeded
+      - TimeLimitExceeded
+    isolated:
+      - OperationalError
+      - deadlock
+  # ✅ Уже покрито — знайдено тікет JQL-пошуком у project = JIJI за унікальним рядком помилки,
+  #    назвою таски або ендпоінтом; також перевірити label = auto-triage.
+  # 🔴 Нове — тікета немає. Закритий тікет + помилка повернулась з реальним обсягом = регресія
+  #    (новий тікет + зв'язок "Relates" на старий).
+  regression_link_type: Relates
+
+jira:
+  site: jijing.atlassian.net
+  cloud_id: 4ae966c7-4f95-4aac-9ee7-24cee120152f
+  project: JIJI
+  issue_type: Bug
+  label: auto-triage
+  browse_url: "https://jijing.atlassian.net/browse/{key}"
+  components:
+    field: customfield_10100
+    min_tags: 3
+    max_tags: 5
+    required: [backend, prod]       # + runtime (celery|uwsgi) + 1–2 тематичні теги
+    existing_values_jql: "project = JIJI AND labels = auto-triage AND cf[10100] is not EMPTY ORDER BY created DESC"
+  cause_link:
+    type: Problem/Incident          # новий баг "is caused by" задача-джерело
+    min_confidence: medium          # high або medium — лінкуємо; low — лише згадка
+  translation_expand_title: "Українською"
+
+limits:
+  max_new_tickets_per_run: 5        # решта кандидатів — у звіт як "понад ліміт"
+
+bitbucket:
+  workspace: cls-gentech
+  repo_slug_env: BITBUCKET_REPO_SLUG
+  email_env: BITBUCKET_EMAIL
+  token_env: BITBUCKET_API_TOKEN
+  clone_dir: /tmp/backend
+  commit_url: "https://bitbucket.org/cls-gentech/{slug}/commits/{sha}"
+  jira_key_regex: "JIJI-\\d+"
+
+status:
+  # Загальний стан продукту за кількістю нових 🔴 у вікні.
+  stable:   {emoji: "🟢", label: "Stable",   max_new: 0}
+  watch:    {emoji: "🟡", label: "Watch",    max_new: 2}
+  degraded: {emoji: "🔴", label: "Degraded", min_new: 3}
+
+report:
+  title_format: "Error triage {date} {ampm}"   # дата й AM/PM за Києвом
+  timezone: Europe/Kyiv
+  icon: chart
+  language: uk
+  template: templates/report.html
