@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Edit(scripts/code_origin.py)",
+      "Edit(CLAUDE.md)",
+      "Edit(.claude/skills/triage/SKILL.md)",
+      "Edit(ROUTINE_PROMPT_STANDALONE.md)"
+    ]
+  }
+}
