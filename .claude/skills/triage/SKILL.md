@@ -26,7 +26,7 @@ Keep the `logs_explorer_url` from every response — tickets and the report need
 
 ## 2. Classify each pattern
 - 🚫 **Infra noise** — anything in `cfg.classification.infra_noise` (timeouts to ES, Redis/Valkey, Mongo, Telegram, Intercom,
-  third-party APIs; `SoftTimeLimitExceeded`/`TimeLimitExceeded`; isolated `OperationalError`/deadlock). **No** tickets.
+  third-party APIs; `TimeLimitExceeded`; isolated `OperationalError`/deadlock). **No** tickets.
 - ✅ **Already covered** — an existing ticket was found: JQL text search in `project = JIJI` for the unique error string,
   task name or endpoint; also check `label = auto-triage`.
 - 🔴 **New** — no ticket. If a closed ticket exists and the error is back at real volume, it is a **regression**:

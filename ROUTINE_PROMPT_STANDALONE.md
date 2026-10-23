@@ -39,7 +39,7 @@ ANALYSIS WINDOW: strictly the last 12 hours (from: now-12h, to: now). All Datado
 
 2. CLASSIFY each pattern:
    🚫 Infra noise — timeouts to Elasticsearch, Redis/Valkey, Mongo, Telegram,
-      Intercom, third-party APIs; SoftTimeLimitExceeded/TimeLimitExceeded;
+      Intercom, third-party APIs; TimeLimitExceeded;
       isolated OperationalError/deadlock. Do NOT create tickets.
    ✅ Already covered — an existing ticket was found (JQL text search in project = JIJI
       for the unique error string, task name or endpoint; also check label = auto-triage).

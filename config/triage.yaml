@@ -33,7 +33,6 @@ classification:
       - Intercom
       - third-party APIs
     exceptions:
-      - SoftTimeLimitExceeded
       - TimeLimitExceeded
     isolated:
       - OperationalError
